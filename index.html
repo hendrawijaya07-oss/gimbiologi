@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Misi Penyelamatan Ginjal - EduGame Biologi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap');
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f0f9ff;
+            overflow-x: hidden;
+        }
+
+        .organ-container {
+            background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+            border: 4px solid #0369a1;
+            border-radius: 2rem;
+            position: relative;
+            min-height: 400px;
+        }
+
+        .molecule {
+            cursor: pointer;
+            transition: transform 0.2s;
+            user-select: none;
+            touch-action: manipulation;
+        }
+
+        .molecule:hover {
+            transform: scale(1.1);
+        }
+
+        .floating {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .status-bar {
+            transition: width 0.5s ease-in-out;
+        }
+
+        .modal {
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(4px);
+        }
+
+        .shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div id="game-container" class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <div class="flex flex-col md:flex-row justify-between items-center mb-6 bg-white p-4 rounded-xl shadow-md border-b-4 border-blue-500">
+            <div>
+                <h1 class="text-2xl font-extrabold text-blue-800">MISI PENYELAMATAN GINJAL</h1>
+                <p class="text-sm text-blue-600 font-semibold" id="stage-name">Tahap 1: Filtrasi (Glomerulus)</p>
+            </div>
+            <div class="flex gap-4 mt-4 md:mt-0 items-center">
+                <!-- Music Control -->
+                <button id="music-toggle" onclick="toggleMusic()" class="bg-blue-100 hover:bg-blue-200 p-2 rounded-full transition">
+                    <span id="music-icon" class="text-xl">🔊</span>
+                </button>
+                <div class="text-center">
+                    <p class="text-xs uppercase text-gray-500 font-bold">Skor</p>
+                    <p class="text-xl font-bold text-blue-600" id="score">0</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-xs uppercase text-gray-500 font-bold">Nyawa</p>
+                    <p class="text-xl font-bold text-red-500" id="lives">❤️❤️❤️</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="w-full bg-gray-200 rounded-full h-4 mb-6">
+            <div id="progress" class="bg-blue-500 h-4 rounded-full status-bar" style="width: 0%"></div>
+        </div>
+
+        <!-- Main Game Area -->
+        <div class="organ-container p-6 shadow-2xl relative overflow-hidden flex flex-wrap justify-center items-center gap-6" id="play-area">
+            <div id="start-screen" class="text-center z-10">
+                <div class="text-6xl mb-4">🫘</div>
+                <h2 class="text-2xl font-bold text-blue-900 mb-2">Siap Menjadi Petugas Ginjal?</h2>
+                <p class="text-blue-700 mb-6 max-w-md mx-auto">Tugas Anda adalah memilah zat yang harus diserap kembali (Reabsorpsi) dan zat yang harus dibuang sebagai urine (Augmentasi/Filtrasi).</p>
+                <button onclick="startGame()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transition transform hover:scale-105">
+                    MULAI PERMAINAN
+                </button>
+            </div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="mt-6 bg-white p-4 rounded-xl border-l-4 border-yellow-400 shadow-sm">
+            <h3 class="font-bold text-gray-800">Cara Bermain:</h3>
+            <p class="text-sm text-gray-600" id="instruction-text">Klik pada zat-zat yang lewat. Pilih yang benar sesuai instruksi tiap tahap untuk mendapatkan poin!</p>
+        </div>
+    </div>
+
+    <!-- Audio Element -->
+    <audio id="bg-music" loop>
+        <source src="https://github.com/hendrawijaya07-oss/musik-game/raw/refs/heads/main/Boss_Key_Sequence.mp3" type="audio/mpeg">
+        Browser Anda tidak mendukung elemen audio.
+    </audio>
+
+    <!-- Modals -->
+    <div id="modal" class="hidden fixed inset-0 modal flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl">
+            <h2 id="modal-title" class="text-3xl font-bold mb-4 text-blue-800">Hebat!</h2>
+            <p id="modal-desc" class="text-gray-600 mb-6">Anda berhasil menyelesaikan tahap ini.</p>
+            <button id="modal-btn" class="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg w-full">LANJUT</button>
+        </div>
+    </div>
+
+    <script>
+        const stages = [
+            {
+                name: "Tahap 1: Filtrasi (Glomerulus)",
+                instruction: "Klik zat yang TERLALU BESAR dan tidak boleh lolos ke kapsula bowman (Sel Darah & Protein)!",
+                target: "bad",
+                molecules: [
+                    { name: "Sel Darah Merah", type: "bad", icon: "🔴" },
+                    { name: "Protein Plasma", type: "bad", icon: "🧬" },
+                    { name: "Air", type: "good", icon: "💧" },
+                    { name: "Glukosa", type: "good", icon: "🍬" },
+                    { name: "Garam", type: "good", icon: "🧂" },
+                    { name: "Urea", type: "good", icon: "🧪" }
+                ],
+                count: 10
+            },
+            {
+                name: "Tahap 2: Reabsorpsi (Tubulus Proksimal)",
+                instruction: "Klik zat BERHARGA yang harus diserap kembali ke pembuluh darah!",
+                target: "good",
+                molecules: [
+                    { name: "Glukosa", type: "good", icon: "🍬" },
+                    { name: "Asam Amino", type: "good", icon: "🧪" },
+                    { name: "Air", type: "good", icon: "💧" },
+                    { name: "Urea", type: "bad", icon: "☣️" },
+                    { name: "Kreatinin", type: "bad", icon: "🗑️" }
+                ],
+                count: 12
+            },
+            {
+                name: "Tahap 3: Augmentasi (Tubulus Distal)",
+                instruction: "Klik ZAT RACUN atau sisa obat yang harus ditambahkan ke urine!",
+                target: "bad",
+                molecules: [
+                    { name: "Sisa Obat", type: "bad", icon: "💊" },
+                    { name: "Amonia", type: "bad", icon: "👃" },
+                    { name: "Kelebihan Vitamin", type: "bad", icon: "🍊" },
+                    { name: "Air", type: "good", icon: "💧" },
+                    { name: "Garam", type: "good", icon: "🧂" }
+                ],
+                count: 15
+            }
+        ];
+
+        let currentStage = 0;
+        let score = 0;
+        let lives = 3;
+        let activeMolecules = 0;
+        let musicPlaying = false;
+
+        const playArea = document.getElementById('play-area');
+        const scoreEl = document.getElementById('score');
+        const livesEl = document.getElementById('lives');
+        const progressEl = document.getElementById('progress');
+        const stageNameEl = document.getElementById('stage-name');
+        const instructionEl = document.getElementById('instruction-text');
+        const modal = document.getElementById('modal');
+        const bgMusic = document.getElementById('bg-music');
+        const musicIcon = document.getElementById('music-icon');
+
+        function toggleMusic() {
+            if (musicPlaying) {
+                bgMusic.pause();
+                musicIcon.innerText = "🔇";
+            } else {
+                bgMusic.play().catch(e => console.log("Autoplay dicegah oleh browser"));
+                musicIcon.innerText = "🔊";
+            }
+            musicPlaying = !musicPlaying;
+        }
+
+        function startGame() {
+            currentStage = 0;
+            score = 0;
+            lives = 3;
+            updateStats();
+            
+            // Start music on first click if not playing
+            if (!musicPlaying) {
+                toggleMusic();
+            }
+            
+            loadStage();
+        }
+
+        function updateStats() {
+            scoreEl.innerText = score;
+            livesEl.innerText = "❤️".repeat(lives);
+            const progressPercent = (currentStage / stages.length) * 100;
+            progressEl.style.width = `${progressPercent}%`;
+        }
+
+        function loadStage() {
+            playArea.innerHTML = '';
+            const stage = stages[currentStage];
+            stageNameEl.innerText = stage.name;
+            instructionEl.innerText = stage.instruction;
+            spawnMolecules();
+        }
+
+        function spawnMolecules() {
+            const stage = stages[currentStage];
+            for (let i = 0; i < stage.count; i++) {
+                setTimeout(() => {
+                    if (lives <= 0) return;
+                    createMolecule();
+                }, i * 900);
+            }
+        }
+
+        function createMolecule() {
+            const stage = stages[currentStage];
+            const molData = stage.molecules[Math.floor(Math.random() * stage.molecules.length)];
+            
+            const div = document.createElement('div');
+            div.className = 'molecule floating bg-white p-3 rounded-full shadow-lg border-2 border-blue-200 text-center flex flex-col items-center justify-center w-24 h-24';
+            div.style.position = 'absolute';
+            div.style.left = Math.random() * 80 + 10 + '%';
+            div.style.top = Math.random() * 70 + 10 + '%';
+            
+            div.innerHTML = `
+                <span class="text-3xl">${molData.icon}</span>
+                <span class="text-[10px] font-bold uppercase leading-tight">${molData.name}</span>
+            `;
+
+            div.onclick = () => handleMoleculeClick(div, molData);
+            playArea.appendChild(div);
+
+            setTimeout(() => {
+                if (div.parentNode) {
+                    div.classList.add('opacity-0', 'transition-opacity');
+                    setTimeout(() => {
+                        if (div.parentNode) {
+                            playArea.removeChild(div);
+                            checkStageCompletion();
+                        }
+                    }, 500);
+                }
+            }, 3500);
+        }
+
+        function handleMoleculeClick(element, data) {
+            const stage = stages[currentStage];
+            
+            if (data.type === stage.target) {
+                score += 10;
+                element.style.pointerEvents = 'none';
+                element.innerHTML = '<span class="text-3xl">✅</span>';
+                element.classList.add('bg-green-100', 'border-green-500', 'scale-110');
+            } else {
+                lives--;
+                score = Math.max(0, score - 5);
+                element.style.pointerEvents = 'none';
+                element.innerHTML = '<span class="text-3xl">❌</span>';
+                element.classList.add('bg-red-100', 'border-red-500', 'shake');
+            }
+
+            updateStats();
+            setTimeout(() => {
+                if (element.parentNode) {
+                    playArea.removeChild(element);
+                    checkStageCompletion();
+                }
+            }, 600);
+
+            if (lives <= 0) {
+                showModal("Gagal!", "Ups! Ginjal mengalami gangguan. Coba lagi untuk memahami fungsinya lebih baik.", "ULANGI", () => location.reload());
+            }
+        }
+
+        function checkStageCompletion() {
+            const remaining = playArea.querySelectorAll('.molecule').length;
+            if (remaining === 0) {
+                if (currentStage < stages.length - 1) {
+                    showModal("Kerja Bagus!", `Tahap ${currentStage + 1} Selesai. Siap lanjut ke tahap berikutnya?`, "LANJUT", () => {
+                        currentStage++;
+                        loadStage();
+                        closeModal();
+                    });
+                } else {
+                    showModal("Selamat!", `Anda telah menguasai proses ekskresi ginjal! Skor Akhir: ${score}`, "MAIN LAGI", () => location.reload());
+                }
+            }
+        }
+
+        function showModal(title, desc, btnText, action) {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-desc').innerText = desc;
+            const btn = document.getElementById('modal-btn');
+            btn.innerText = btnText;
+            btn.onclick = action;
+            modal.classList.remove('hidden');
+        }
+
+        function closeModal() {
+            modal.classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
